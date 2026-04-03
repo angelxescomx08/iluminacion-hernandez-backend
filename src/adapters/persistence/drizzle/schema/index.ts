@@ -1,5 +1,6 @@
 export * from "./auth.tables.js";
 export * from "./catalog.tables.js";
+export * from "./logging.tables.js";
 export * from "./orders.tables.js";
 
 import {
@@ -18,6 +19,7 @@ import {
   products,
   productsRelations,
 } from "./catalog.tables.js";
+import { inboundPayloadErrors } from "./logging.tables.js";
 
 /** Tablas expuestas al adaptador de Better Auth (claves = nombres de modelo internos). */
 export const authSchema = {
@@ -44,4 +46,5 @@ export const appSchema = {
   ordersRelations,
   orderItems,
   orderItemsRelations,
+  inboundPayloadErrors,
 };
