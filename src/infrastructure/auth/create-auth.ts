@@ -3,6 +3,18 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { AppDatabase } from "../../adapters/persistence/postgres/postgres-database.adapter.js";
 import { authSchema } from "../../adapters/persistence/drizzle/schema/index.js";
 
+function googleSocialProvider() {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) return {};
+  return {
+    google: {
+      clientId,
+      clientSecret,
+    },
+  };
+}
+
 export function createAuth(database: AppDatabase) {
   const trustedOrigins = process.env.TRUSTED_ORIGINS?.split(",")
     .map((o) => o.trim())
@@ -14,6 +26,7 @@ export function createAuth(database: AppDatabase) {
       schema: authSchema,
     }),
     emailAndPassword: { enabled: true },
+    socialProviders: googleSocialProvider(),
     user: {
       additionalFields: {
         role: {

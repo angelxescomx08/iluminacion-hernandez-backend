@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
 import type { Auth } from "../../infrastructure/auth/create-auth.js";
 import type { LogInboundPayloadErrorUseCase } from "../../use-cases/log-inbound-payload-error.use-case.js";
+import { createAuthRouter } from "./auth.routes.js";
 import { createGlobalErrorHandler } from "./middleware/global-error.middleware.js";
 import { HelloController } from "./hello.controller.js";
 import { GreetUseCase } from "../../use-cases/greet.use-case.js";
@@ -33,6 +34,8 @@ export function createApp(options: CreateAppOptions): express.Application {
   app.all("/api/auth/*", toNodeHandler(auth));
 
   app.use(express.json({ limit: "1mb" }));
+
+  app.use("/api/v1/auth", createAuthRouter(auth));
 
   const greetUseCase = new GreetUseCase();
   const helloController = new HelloController(greetUseCase);
