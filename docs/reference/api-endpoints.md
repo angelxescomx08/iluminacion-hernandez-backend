@@ -46,6 +46,34 @@ Descripción técnica de las rutas expuestas por el servidor Express. Pensada pa
 
 ## Endpoints de la aplicación
 
+### Catálogo de productos (`/api/v1/products`)
+
+**Condición de montaje:** el servidor solo registra estas rutas si existen `STRIPE_SECRET_KEY`, `S3_BUCKET` y `S3_PUBLIC_BASE_URL`. Revisa `.env.example`.
+
+**Slug:** cada producto tiene `slug` único y legible (SEO / rastreadores). Consulta detalle público con `GET /api/v1/products/by-slug/:slug`.
+
+**Imágenes:** se almacena la **URL pública completa** en base de datos; la clave S3 opcional (`object_key`) sirve para borrado en el bucket. Stripe recibe hasta 8 URLs (orden: principal primero).
+
+**Administración:** mutaciones requieren sesión Better Auth con `role: "admin"` (misma cookie/sesión que `/api/v1/auth`).
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/products` | No | Listado paginado. Query: `page`, `pageSize`, `q` (título o descripción, `ILIKE`), `characteristics` (JSON string, contención `@>` en JSONB), `activeOnly` (`true` por defecto; `false` incluye inactivos). |
+| `GET` | `/api/v1/products/by-slug/:slug` | No | Detalle por slug (p. ej. páginas públicas y bots). |
+| `GET` | `/api/v1/products/:id` | No | Detalle por id. |
+| `POST` | `/api/v1/products` | Admin | Crea producto en PostgreSQL y **Stripe** (Product + precio por defecto). Cuerpo JSON: `title` (obligatorio), `price` (número, obligatorio), `description`, `content`, `characteristics` (objeto), `stock`, `isActive`. |
+| `PATCH` | `/api/v1/products/:id` | Admin | Actualiza campos; si cambia `price`, se crea un nuevo precio en Stripe y se desactiva el anterior. |
+| `DELETE` | `/api/v1/products/:id` | Admin | Baja lógica: `is_active = false` y producto archivado en Stripe. |
+| `POST` | `/api/v1/products/:id/images` | Admin | Sube imagen a **S3** (`multipart/form-data`, campo archivo `file`, máx. 5 MB, JPEG/PNG/WebP). Sincroniza imágenes en Stripe. |
+| `DELETE` | `/api/v1/products/:id/images/:imageId` | Admin | Elimina imagen en BD y en S3 (si hay `object_key`). Si era principal, promueve otra. |
+| `PATCH` | `/api/v1/products/:id/images/:imageId/main` | Admin | Marca la imagen como principal y actualiza Stripe. |
+
+**Respuestas:** listado `{ data, pagination: { total, page, pageSize, totalPages } }`. Detalle y mutaciones devuelven producto con `images` (sin exponer `object_key` al cliente). Tras crear/actualizar como admin, la respuesta puede incluir `stripeProductId` y `stripePriceId`.
+
+**Errores 4xx:** el middleware global devuelve `{ error, code? }` para errores de dominio (`HttpError`).
+
+---
+
 ### `GET /api/hello`
 
 | | |
@@ -153,9 +181,13 @@ El resto de rutas (`sign-up`, `sign-in`, gestión de cuenta, etc.) están defini
 | `BETTER_AUTH_SECRET` | Secreto criptográfico (mínimo 32 caracteres recomendado). |
 | `BETTER_AUTH_URL` | URL base pública del backend para auth y callbacks. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Habilitan login Google si ambas están definidas. |
+| `STRIPE_SECRET_KEY` / `STRIPE_CURRENCY` | Catálogo: creación de Product/Price en Stripe. |
+| `AWS_REGION`, `S3_BUCKET`, `S3_PUBLIC_BASE_URL`, `S3_ENDPOINT` (opc.) | Catálogo: subida y URL pública de imágenes. |
 
 ---
 
 ## Changelog de esta referencia
 
 Actualiza este archivo cuando añadas o cambies rutas en `express-app` o en los routers montados.
+
+- Catálogo `/api/v1/products` (Stripe + S3, slug, imágenes, paginación y búsqueda).

@@ -15,6 +15,20 @@
       "when": 1775252613313,
       "tag": "0001_inbound_payload_errors",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775260545740,
+      "tag": "0002_peaceful_the_professor",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775260560531,
+      "tag": "0003_dazzling_rage",
+      "breakpoints": true
     }
   ]
 }

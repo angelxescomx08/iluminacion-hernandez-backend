@@ -1,6 +1,6 @@
 import compression from "compression";
 import cors from "cors";
-import express from "express";
+import express, { type Router } from "express";
 import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
 import type { Auth } from "../../infrastructure/auth/create-auth.js";
@@ -13,10 +13,11 @@ import { GreetUseCase } from "../../use-cases/greet.use-case.js";
 export type CreateAppOptions = {
   auth: Auth;
   logInboundPayloadError: LogInboundPayloadErrorUseCase;
+  productRouter?: Router;
 };
 
 export function createApp(options: CreateAppOptions): express.Application {
-  const { auth, logInboundPayloadError } = options;
+  const { auth, logInboundPayloadError, productRouter } = options;
   const app = express();
 
   app.use(helmet());
@@ -36,6 +37,10 @@ export function createApp(options: CreateAppOptions): express.Application {
   app.use(express.json({ limit: "1mb" }));
 
   app.use("/api/v1/auth", createAuthRouter(auth));
+
+  if (productRouter) {
+    app.use("/api/v1/products", productRouter);
+  }
 
   const greetUseCase = new GreetUseCase();
   const helloController = new HelloController(greetUseCase);

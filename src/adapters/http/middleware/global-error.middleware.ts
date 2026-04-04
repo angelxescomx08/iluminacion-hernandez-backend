@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from "express";
+import { HttpError } from "../../../domain/errors/http-error.js";
 import type { LogInboundPayloadErrorUseCase } from "../../../use-cases/log-inbound-payload-error.use-case.js";
 
 function normalizeError(value: unknown): Error {
@@ -36,6 +37,14 @@ export function createGlobalErrorHandler(
 
     if (res.headersSent) {
       next(error);
+      return;
+    }
+
+    if (error instanceof HttpError) {
+      res.status(error.statusCode).json({
+        error: error.message,
+        ...(error.code ? { code: error.code } : {}),
+      });
       return;
     }
 
