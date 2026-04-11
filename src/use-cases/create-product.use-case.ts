@@ -9,7 +9,7 @@ export type CreateProductCommand = {
   title: string;
   description?: string | null;
   content?: string | null;
-  characteristics?: Record<string, unknown> | null;
+  characteristics?: string | null;
   price: number;
   stock?: number;
   isActive?: boolean;

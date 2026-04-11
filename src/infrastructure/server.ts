@@ -18,6 +18,10 @@ import { LogInboundPayloadErrorUseCase } from "../use-cases/log-inbound-payload-
 import { SetMainProductImageUseCase } from "../use-cases/set-main-product-image.use-case.js";
 import { UpdateProductUseCase } from "../use-cases/update-product.use-case.js";
 import { createAuth } from "./auth/create-auth.js";
+import {
+  createUnconfiguredObjectStoragePort,
+  createUnconfiguredProductCatalogPort,
+} from "./unconfigured-ports.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -36,35 +40,41 @@ const s3PublicBaseUrl = process.env.S3_PUBLIC_BASE_URL?.trim();
 const awsRegion = (process.env.AWS_REGION ?? "us-east-1").trim();
 const s3Endpoint = process.env.S3_ENDPOINT?.trim();
 
-const productRouter = (() => {
-  if (!stripeSecretKey || !s3Bucket || !s3PublicBaseUrl) return undefined;
-  const productRepo = new ProductDrizzleRepository(database.db);
-  const stripeCatalog = new StripeCatalogAdapter(stripeSecretKey);
-  const objectStorage = new S3ObjectStorageAdapter({
-    region: awsRegion,
-    bucket: s3Bucket,
-    publicBaseUrl: s3PublicBaseUrl,
-    ...(s3Endpoint ? { endpoint: s3Endpoint } : {}),
-  });
-  return createProductRouter({
-    auth,
-    listProducts: new ListProductsUseCase(productRepo),
-    getProductBySlug: new GetProductBySlugUseCase(productRepo),
-    getProductById: new GetProductByIdUseCase(productRepo),
-    createProduct: new CreateProductUseCase(productRepo, stripeCatalog, stripeCurrency),
-    updateProduct: new UpdateProductUseCase(productRepo, stripeCatalog, stripeCurrency),
-    deleteProduct: new DeleteProductUseCase(productRepo, stripeCatalog),
-    addProductImage: new AddProductImageUseCase(productRepo, objectStorage, stripeCatalog),
-    deleteProductImage: new DeleteProductImageUseCase(productRepo, objectStorage, stripeCatalog),
-    setMainProductImage: new SetMainProductImageUseCase(productRepo, stripeCatalog),
-  });
-})();
+const productRepo = new ProductDrizzleRepository(database.db);
+const stripeCatalog = stripeSecretKey
+  ? new StripeCatalogAdapter(stripeSecretKey)
+  : createUnconfiguredProductCatalogPort();
+const objectStorage =
+  s3Bucket && s3PublicBaseUrl
+    ? new S3ObjectStorageAdapter({
+        region: awsRegion,
+        bucket: s3Bucket,
+        publicBaseUrl: s3PublicBaseUrl,
+        ...(s3Endpoint ? { endpoint: s3Endpoint } : {}),
+      })
+    : createUnconfiguredObjectStoragePort();
 
-if (!productRouter) {
+if (!stripeSecretKey) {
+  console.warn("STRIPE_SECRET_KEY ausente: POST/PATCH de productos responderán 503 hasta configurar Stripe.");
+}
+if (!s3Bucket || !s3PublicBaseUrl) {
   console.warn(
-    "Catálogo deshabilitado: definen STRIPE_SECRET_KEY, S3_BUCKET y S3_PUBLIC_BASE_URL para montar /api/v1/products.",
+    "S3_BUCKET o S3_PUBLIC_BASE_URL ausentes: la subida de imágenes responderá 503 hasta configurar S3.",
   );
 }
+
+const productRouter = createProductRouter({
+  auth,
+  listProducts: new ListProductsUseCase(productRepo),
+  getProductBySlug: new GetProductBySlugUseCase(productRepo),
+  getProductById: new GetProductByIdUseCase(productRepo),
+  createProduct: new CreateProductUseCase(productRepo, stripeCatalog, stripeCurrency),
+  updateProduct: new UpdateProductUseCase(productRepo, stripeCatalog, stripeCurrency),
+  deleteProduct: new DeleteProductUseCase(productRepo, stripeCatalog),
+  addProductImage: new AddProductImageUseCase(productRepo, objectStorage, stripeCatalog),
+  deleteProductImage: new DeleteProductImageUseCase(productRepo, objectStorage, stripeCatalog),
+  setMainProductImage: new SetMainProductImageUseCase(productRepo, stripeCatalog),
+});
 
 const port = Number(process.env.PORT) || 3000;
 const app = createApp({ auth, logInboundPayloadError, productRouter });

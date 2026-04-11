@@ -1,13 +1,5 @@
 import { relations } from "drizzle-orm";
-import {
-  boolean,
-  decimal,
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { boolean, decimal, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { users } from "./auth.tables.js";
 
 export const products = pgTable("products", {
@@ -16,7 +8,7 @@ export const products = pgTable("products", {
   slug: text("slug").notNull().unique(),
   description: text("description"),
   content: text("content"),
-  characteristics: jsonb("characteristics").$type<Record<string, unknown>>(),
+  characteristics: text("characteristics"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   stock: integer("stock").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),

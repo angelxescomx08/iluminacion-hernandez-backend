@@ -1,0 +1,1 @@
+ALTER TABLE "products" ALTER COLUMN "characteristics" SET DATA TYPE text USING ("characteristics"::text);

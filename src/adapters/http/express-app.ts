@@ -13,7 +13,7 @@ import { GreetUseCase } from "../../use-cases/greet.use-case.js";
 export type CreateAppOptions = {
   auth: Auth;
   logInboundPayloadError: LogInboundPayloadErrorUseCase;
-  productRouter?: Router;
+  productRouter: Router;
 };
 
 export function createApp(options: CreateAppOptions): express.Application {
@@ -38,9 +38,7 @@ export function createApp(options: CreateAppOptions): express.Application {
 
   app.use("/api/v1/auth", createAuthRouter(auth));
 
-  if (productRouter) {
-    app.use("/api/v1/products", productRouter);
-  }
+  app.use("/api/v1/products", productRouter);
 
   const greetUseCase = new GreetUseCase();
   const helloController = new HelloController(greetUseCase);

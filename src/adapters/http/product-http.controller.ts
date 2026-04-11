@@ -11,23 +11,6 @@ import { ListProductsUseCase } from "../../use-cases/list-products.use-case.js";
 import { SetMainProductImageUseCase } from "../../use-cases/set-main-product-image.use-case.js";
 import { UpdateProductUseCase } from "../../use-cases/update-product.use-case.js";
 
-function parseCharacteristics(raw: unknown): Record<string, unknown> | undefined {
-  if (raw === undefined || raw === "") return undefined;
-  if (typeof raw !== "string") {
-    throw new HttpError("Parámetro characteristics inválido", 400, "invalid_characteristics");
-  }
-  try {
-    const value = JSON.parse(raw) as unknown;
-    if (value === null || typeof value !== "object" || Array.isArray(value)) {
-      throw new HttpError("characteristics debe ser un objeto JSON", 400, "invalid_characteristics");
-    }
-    return value as Record<string, unknown>;
-  } catch (e) {
-    if (e instanceof HttpError) throw e;
-    throw new HttpError("characteristics debe ser JSON válido", 400, "invalid_characteristics");
-  }
-}
-
 function parseActiveOnly(raw: unknown): boolean | undefined {
   if (raw === undefined || raw === "") return undefined;
   if (raw === "false" || raw === "0") return false;
@@ -47,13 +30,13 @@ function firstQueryString(value: unknown): string | undefined {
   return undefined;
 }
 
-function asCharacteristicsRecord(value: unknown): Record<string, unknown> | null {
+function asCharacteristicsText(value: unknown): string | null {
   if (value === undefined) return null;
   if (value === null) return null;
-  if (typeof value !== "object" || Array.isArray(value)) {
-    throw new HttpError("characteristics debe ser un objeto", 400, "invalid_body");
+  if (typeof value !== "string") {
+    throw new HttpError("characteristics debe ser texto", 400, "invalid_body");
   }
-  return value as Record<string, unknown>;
+  return value;
 }
 
 function toPublicProductJson(p: ProductWithImages) {
@@ -102,13 +85,13 @@ export class ProductHttpController {
 
   list: RequestHandler = async (req, res, next) => {
     try {
-      const characteristics = parseCharacteristics(firstQueryString(req.query.characteristics));
+      const characteristicsFilter = firstQueryString(req.query.characteristics)?.trim() || undefined;
       const activeOnly = parseActiveOnly(firstQueryString(req.query.activeOnly));
       const result = await this.listProducts.execute({
         page: parsePage(req.query.page, 1),
         pageSize: parsePage(req.query.pageSize, 20),
         q: firstQueryString(req.query.q),
-        characteristics,
+        characteristics: characteristicsFilter,
         activeOnly: activeOnly ?? true,
       });
       const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
@@ -169,7 +152,7 @@ export class ProductHttpController {
         description: typeof body.description === "string" ? body.description : null,
         content: typeof body.content === "string" ? body.content : null,
         characteristics:
-          body.characteristics === undefined ? null : asCharacteristicsRecord(body.characteristics),
+          body.characteristics === undefined ? null : asCharacteristicsText(body.characteristics),
         price,
         stock: typeof body.stock === "number" ? body.stock : undefined,
         isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
@@ -202,7 +185,7 @@ export class ProductHttpController {
       }
       if (body.characteristics !== undefined) {
         patch.characteristics =
-          body.characteristics === null ? null : asCharacteristicsRecord(body.characteristics);
+          body.characteristics === null ? null : asCharacteristicsText(body.characteristics);
       }
       if (body.price !== undefined) {
         if (typeof body.price !== "number" || !Number.isFinite(body.price)) {

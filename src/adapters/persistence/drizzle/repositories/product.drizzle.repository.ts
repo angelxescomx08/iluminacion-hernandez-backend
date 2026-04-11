@@ -1,16 +1,4 @@
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  ilike,
-  max,
-  ne,
-  or,
-  sql,
-  type SQL,
-} from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, max, ne, or, type SQL } from "drizzle-orm";
 import type { Product, ProductImage, ProductWithImages } from "../../../../domain/entities/product.entity.js";
 import type {
   PaginatedProducts,
@@ -64,16 +52,18 @@ function buildListConditions(filters: ProductListFilters): SQL | undefined {
   const search = filters.search?.trim();
   if (search && search.length > 0) {
     const safe = `%${sanitizeLikeFragment(search)}%`;
-    const titleOrDesc = or(ilike(products.title, safe), ilike(products.description, safe));
-    if (titleOrDesc) parts.push(titleOrDesc);
+    const titleDescOrChars = or(
+      ilike(products.title, safe),
+      ilike(products.description, safe),
+      ilike(products.characteristics, safe),
+    );
+    if (titleDescOrChars) parts.push(titleDescOrChars);
   }
 
-  if (
-    filters.characteristicsContains &&
-    Object.keys(filters.characteristicsContains).length > 0
-  ) {
-    const payload = JSON.stringify(filters.characteristicsContains);
-    parts.push(sql`coalesce(${products.characteristics}, '{}'::jsonb) @> ${payload}::jsonb`);
+  const charSearch = filters.characteristicsSearch?.trim();
+  if (charSearch && charSearch.length > 0) {
+    const safe = `%${sanitizeLikeFragment(charSearch)}%`;
+    parts.push(ilike(products.characteristics, safe));
   }
 
   if (parts.length === 0) return undefined;

@@ -4,7 +4,8 @@ export type ListProductsQuery = {
   page?: number;
   pageSize?: number;
   q?: string;
-  characteristics?: Record<string, unknown>;
+  /** Búsqueda por texto libre dentro de `characteristics`. */
+  characteristics?: string;
   activeOnly?: boolean;
 };
 
@@ -16,7 +17,7 @@ export class ListProductsUseCase {
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const filters: ProductListFilters = {
       search: query.q?.trim() || undefined,
-      characteristicsContains: query.characteristics,
+      characteristicsSearch: query.characteristics?.trim() || undefined,
       activeOnly: query.activeOnly ?? true,
     };
     return this.products.list({ filters, page, pageSize });

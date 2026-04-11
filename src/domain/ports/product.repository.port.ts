@@ -2,7 +2,8 @@ import type { Product, ProductImage, ProductWithImages } from "../entities/produ
 
 export type ProductListFilters = {
   search?: string;
-  characteristicsContains?: Record<string, unknown>;
+  /** Subcadena en la columna `characteristics` (ILIKE). */
+  characteristicsSearch?: string;
   activeOnly?: boolean;
 };
 

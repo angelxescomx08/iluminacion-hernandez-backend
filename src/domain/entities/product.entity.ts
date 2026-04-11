@@ -1,12 +1,10 @@
-export type ProductCharacteristics = Record<string, unknown>;
-
 export type Product = {
   id: string;
   title: string;
   slug: string;
   description: string | null;
   content: string | null;
-  characteristics: ProductCharacteristics | null;
+  characteristics: string | null;
   price: string;
   stock: number;
   isActive: boolean;

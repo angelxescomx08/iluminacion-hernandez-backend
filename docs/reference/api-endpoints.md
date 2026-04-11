@@ -48,7 +48,7 @@ Descripción técnica de las rutas expuestas por el servidor Express. Pensada pa
 
 ### Catálogo de productos (`/api/v1/products`)
 
-**Condición de montaje:** el servidor solo registra estas rutas si existen `STRIPE_SECRET_KEY`, `S3_BUCKET` y `S3_PUBLIC_BASE_URL`. Revisa `.env.example`.
+**Montaje:** las rutas están **siempre** registradas. Si falta `STRIPE_SECRET_KEY`, crear o actualizar productos en Stripe devuelve **503** (`code: stripe_not_configured`). Si faltan `S3_BUCKET` o `S3_PUBLIC_BASE_URL`, subir o borrar archivos en S3 devuelve **503** (`code: s3_not_configured`). Revisa `.env.example`.
 
 **Slug:** cada producto tiene `slug` único y legible (SEO / rastreadores). Consulta detalle público con `GET /api/v1/products/by-slug/:slug`.
 
@@ -58,10 +58,10 @@ Descripción técnica de las rutas expuestas por el servidor Express. Pensada pa
 
 | Método | Ruta | Auth | Descripción |
 |--------|------|------|-------------|
-| `GET` | `/api/v1/products` | No | Listado paginado. Query: `page`, `pageSize`, `q` (título o descripción, `ILIKE`), `characteristics` (JSON string, contención `@>` en JSONB), `activeOnly` (`true` por defecto; `false` incluye inactivos). |
+| `GET` | `/api/v1/products` | No | Listado paginado. Query: `page`, `pageSize`, `q` (título, descripción o texto de `characteristics`, `ILIKE`), `characteristics` (texto, subcadena `ILIKE` solo en la columna `characteristics`), `activeOnly` (`true` por defecto; `false` incluye inactivos). |
 | `GET` | `/api/v1/products/by-slug/:slug` | No | Detalle por slug (p. ej. páginas públicas y bots). |
 | `GET` | `/api/v1/products/:id` | No | Detalle por id. |
-| `POST` | `/api/v1/products` | Admin | Crea producto en PostgreSQL y **Stripe** (Product + precio por defecto). Cuerpo JSON: `title` (obligatorio), `price` (número, obligatorio), `description`, `content`, `characteristics` (objeto), `stock`, `isActive`. |
+| `POST` | `/api/v1/products` | Admin | Crea producto en PostgreSQL y **Stripe** (Product + precio por defecto). Cuerpo JSON: `title` (obligatorio), `price` (número, obligatorio), `description`, `content`, `characteristics` (**string**, texto libre), `stock`, `isActive`. |
 | `PATCH` | `/api/v1/products/:id` | Admin | Actualiza campos; si cambia `price`, se crea un nuevo precio en Stripe y se desactiva el anterior. |
 | `DELETE` | `/api/v1/products/:id` | Admin | Baja lógica: `is_active = false` y producto archivado en Stripe. |
 | `POST` | `/api/v1/products/:id/images` | Admin | Sube imagen a **S3** (`multipart/form-data`, campo archivo `file`, máx. 5 MB, JPEG/PNG/WebP). Sincroniza imágenes en Stripe. |
@@ -70,7 +70,7 @@ Descripción técnica de las rutas expuestas por el servidor Express. Pensada pa
 
 **Respuestas:** listado `{ data, pagination: { total, page, pageSize, totalPages } }`. Detalle y mutaciones devuelven producto con `images` (sin exponer `object_key` al cliente). Tras crear/actualizar como admin, la respuesta puede incluir `stripeProductId` y `stripePriceId`.
 
-**Errores 4xx:** el middleware global devuelve `{ error, code? }` para errores de dominio (`HttpError`).
+**Errores `HttpError`:** el middleware global devuelve `{ error, code? }` con el código HTTP correspondiente (4xx y 5xx, p. ej. 503 si Stripe o S3 no están configurados).
 
 ---
 
