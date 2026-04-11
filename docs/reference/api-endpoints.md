@@ -48,7 +48,7 @@ Descripción técnica de las rutas expuestas por el servidor Express. Pensada pa
 
 ### Catálogo de productos (`/api/v1/products`)
 
-**Montaje:** las rutas están **siempre** registradas. Si falta `STRIPE_SECRET_KEY`, crear o actualizar productos en Stripe devuelve **503** (`code: stripe_not_configured`). Si faltan `S3_BUCKET` o `S3_PUBLIC_BASE_URL`, subir o borrar archivos en S3 devuelve **503** (`code: s3_not_configured`). Revisa `.env.example`.
+**Montaje:** las rutas están **siempre** registradas. Si falta `STRIPE_SECRET_KEY`, crear o actualizar productos en Stripe devuelve **503** (`code: stripe_not_configured`). Si falta `S3_BUCKET`, subir o borrar archivos en S3 devuelve **503** (`code: s3_not_configured`). La URL pública de cada objeto se genera sola: en AWS como `https://{bucket}.s3.{region}.amazonaws.com/{key}`; con `S3_ENDPOINT` (MinIO) como `{endpoint}/{bucket}/{key}`. Opcional `S3_PUBLIC_BASE_URL` solo si usas CloudFront u otro dominio. Revisa `.env.example`.
 
 **Slug:** cada producto tiene `slug` único y legible (SEO / rastreadores). Consulta detalle público con `GET /api/v1/products/by-slug/:slug`.
 
@@ -182,7 +182,7 @@ El resto de rutas (`sign-up`, `sign-in`, gestión de cuenta, etc.) están defini
 | `BETTER_AUTH_URL` | URL base pública del backend para auth y callbacks. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Habilitan login Google si ambas están definidas. |
 | `STRIPE_SECRET_KEY` / `STRIPE_CURRENCY` | Catálogo: creación de Product/Price en Stripe. |
-| `AWS_REGION`, `S3_BUCKET`, `S3_PUBLIC_BASE_URL`, `S3_ENDPOINT` (opc.) | Catálogo: subida y URL pública de imágenes. |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (y opc. `AWS_SESSION_TOKEN`), `AWS_REGION`, `S3_BUCKET`, `S3_ENDPOINT` (opc.), `S3_PUBLIC_BASE_URL` (opc.) | Catálogo: credenciales y bucket S3 (o MinIO con las mismas variables + `S3_ENDPOINT`). |
 
 ---
 

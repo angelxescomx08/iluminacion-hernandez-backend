@@ -44,23 +44,20 @@ const productRepo = new ProductDrizzleRepository(database.db);
 const stripeCatalog = stripeSecretKey
   ? new StripeCatalogAdapter(stripeSecretKey)
   : createUnconfiguredProductCatalogPort();
-const objectStorage =
-  s3Bucket && s3PublicBaseUrl
-    ? new S3ObjectStorageAdapter({
-        region: awsRegion,
-        bucket: s3Bucket,
-        publicBaseUrl: s3PublicBaseUrl,
-        ...(s3Endpoint ? { endpoint: s3Endpoint } : {}),
-      })
-    : createUnconfiguredObjectStoragePort();
+const objectStorage = s3Bucket
+  ? new S3ObjectStorageAdapter({
+      region: awsRegion,
+      bucket: s3Bucket,
+      ...(s3PublicBaseUrl ? { publicBaseUrl: s3PublicBaseUrl } : {}),
+      ...(s3Endpoint ? { endpoint: s3Endpoint } : {}),
+    })
+  : createUnconfiguredObjectStoragePort();
 
 if (!stripeSecretKey) {
   console.warn("STRIPE_SECRET_KEY ausente: POST/PATCH de productos responderán 503 hasta configurar Stripe.");
 }
-if (!s3Bucket || !s3PublicBaseUrl) {
-  console.warn(
-    "S3_BUCKET o S3_PUBLIC_BASE_URL ausentes: la subida de imágenes responderá 503 hasta configurar S3.",
-  );
+if (!s3Bucket) {
+  console.warn("S3_BUCKET ausente: la subida de imágenes responderá 503 hasta configurar S3.");
 }
 
 const productRouter = createProductRouter({

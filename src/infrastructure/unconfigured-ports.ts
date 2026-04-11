@@ -12,7 +12,7 @@ function stripeNotConfigured(): never {
 
 function s3NotConfigured(): never {
   throw new HttpError(
-    "Almacenamiento de imágenes no configurado: define S3_BUCKET y S3_PUBLIC_BASE_URL.",
+    "Almacenamiento de imágenes no configurado: define S3_BUCKET (y credenciales AWS o S3_ENDPOINT para MinIO).",
     503,
     "s3_not_configured",
   );
