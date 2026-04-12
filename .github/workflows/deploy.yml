@@ -1,0 +1,47 @@
+name: Deploy Backend
+on:
+  push:
+    branches: [ main ] # Se activa al subir cambios a la rama main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Build Project
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "dist,package.json,pnpm-lock.yaml"
+          target: "~/apps/backend"
+
+      - name: Restart App on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/apps/backend
+            pnpm install --prod
+            pm2 restart node-api || PORT=3000 pm2 start dist/index.js --name "node-api"
+            pm2 save
