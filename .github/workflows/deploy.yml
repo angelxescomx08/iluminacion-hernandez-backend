@@ -9,6 +9,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # --- PASO 1: PRUEBA DE FUEGO (ANTES DE TODO) ---
+      - name: Test SSH Connection
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          echo "Escaneando servidor..."
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          
+          echo "Verificando acceso a la instancia..."
+          ssh -i ~/.ssh/id_rsa -o ConnectTimeout=10 root@${{ secrets.EC2_HOST }} "echo '✅ La llave funciona. Usuario: ' && whoami"
+
+      # --- PASO 2: SI LA LLAVE FUNCIONA, PREPARAMOS EL ENTORNO ---
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
@@ -18,38 +34,36 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
+      # --- PASO 3: CONSTRUCCIÓN ---
       - name: Build Project
         run: |
           pnpm install --no-frozen-lockfile
           pnpm run build
 
-      - name: Deploy via Rsync (Nativo)
+      # --- PASO 4: DESPLIEGUE ---
+      - name: Native Deploy (SCP)
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
-          # 1. Configurar la llave
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          # 1. Empacar (OJO: Asegúrate que la carpeta 'drizzle' existe en tu repo)
+          # Si no existe, quítala de esta lista para que no falle el comando tar
+          tar -czf deploy.tar.gz dist package.json pnpm-lock.yaml drizzle.config.ts drizzle
           
-          # 2. Escanear el servidor para evitar la pregunta de "Confía en este host?"
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          # 2. Subir
+          scp -i ~/.ssh/id_rsa deploy.tar.gz root@${{ secrets.EC2_HOST }}:/root/apps/backend/
           
-          # 3. Sincronizar (Solo subimos lo necesario)
-          # Esto es mucho más estable que la acción anterior
-          rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa" \
-            dist package.json pnpm-lock.yaml drizzle.config.ts drizzle \
-            root@${{ secrets.EC2_HOST }}:/root/apps/backend/
-
-      - name: Migrate and Restart
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: root
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
+          # 3. Comandos remotos
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.EC2_HOST }} << 'EOF'
             cd /root/apps/backend
+            tar -xzf deploy.tar.gz
+            rm deploy.tar.gz
+            
             pnpm install --prod --no-frozen-lockfile
+            
+            echo "--- Ejecutando Migraciones ---"
             pnpm run db:migrate
+            
+            echo "--- Reiniciando PM2 ---"
             pm2 restart backend-api || PORT=3000 pm2 start dist/infrastructure/server.js --name "backend-api"
             pm2 save
+          EOF
