@@ -20,6 +20,8 @@ export function createApp(options: CreateAppOptions): express.Application {
   const { auth, logInboundPayloadError, productRouter } = options;
   const app = express();
 
+  app.set("trust proxy", true);
+
   app.use(helmet());
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
     .map((o) => o.trim())
