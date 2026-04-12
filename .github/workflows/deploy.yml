@@ -11,12 +11,11 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        # Eliminamos la línea "version" para que la lea del package.json
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22 # Usamos 22 para estar al día
+          node-version: 22
           cache: 'pnpm'
 
       - name: Build Project
@@ -30,10 +29,14 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 10m # Aumentado para evitar error 142
-          # Copiamos dist, configs y carpeta de migraciones (ajusta si se llama distinto)
+          port: 22
+          timeout: 120s # Aumentamos tiempo de conexión
+          command_timeout: 10m # Tiempo de sobra para el copiado
+          # EXTREMADAMENTE IMPORTANTE: Asegúrate de que estas carpetas existan en tu repo
           source: "dist,package.json,pnpm-lock.yaml,drizzle.config.ts,drizzle"
-          target: "~/apps/backend"
+          target: "/root/apps/backend"
+          strip_components: 0
+          overwrite: true
 
       - name: Migrate and Restart
         uses: appleboy/ssh-action@v1.0.3
@@ -41,14 +44,17 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
           script: |
-            cd ~/apps/backend
+            cd /root/apps/backend
+            
+            # Instalar dependencias de producción
             pnpm install --prod --no-frozen-lockfile
             
             # Ejecutar migraciones de Drizzle
             echo "Ejecutando migraciones..."
             pnpm run db:migrate
             
-            # Reiniciar con PM2 usando la ruta de tu "main"
+            # Reiniciar con PM2 (Ruta absoluta del main)
             pm2 restart backend-api || PORT=3000 pm2 start dist/infrastructure/server.js --name "backend-api"
             pm2 save
