@@ -5,3 +5,4 @@ pnpm-debug.log*
 .env
 .env.*.local
 .DS_Store
+.env.prod
