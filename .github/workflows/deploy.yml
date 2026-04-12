@@ -9,7 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # --- PRUEBA DE CONEXIÓN AHORA COMO EC2-USER ---
       - name: Test SSH Connection
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
@@ -18,9 +17,7 @@ jobs:
           echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-          
-          echo "Verificando acceso como ec2-user..."
-          ssh -i ~/.ssh/id_rsa -o ConnectTimeout=10 ec2-user@${{ secrets.EC2_HOST }} "echo '✅ CONEXIÓN EXITOSA' && whoami"
+          ssh -i ~/.ssh/id_rsa -o ConnectTimeout=10 ec2-user@${{ secrets.EC2_HOST }} "echo '✅ CONEXIÓN OK' && node -v"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -28,7 +25,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24 # Usamos la misma que el servidor
           cache: 'pnpm'
 
       - name: Build Project
@@ -40,24 +37,35 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
-          # Empacamos (Asegúrate de que 'drizzle' existe o quítalo de aquí)
-          tar -czf deploy.tar.gz dist package.json pnpm-lock.yaml drizzle.config.ts drizzle
+          # Empacamos dist, package, lock, config de drizzle y la carpeta de migraciones
+          # Si tu carpeta de migraciones NO se llama 'drizzle', cambia el nombre aquí
+          tar -czf deploy_backend.tar.gz dist package.json pnpm-lock.yaml drizzle.config.ts drizzle
           
-          # Subimos al home de ec2-user
-          scp -i ~/.ssh/id_rsa deploy.tar.gz ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/apps/backend/
-          
+          scp -i ~/.ssh/id_rsa deploy_backend.tar.gz ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/apps/backend/
+
+      - name: Remote Commands
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
           ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /home/ec2-user/apps/backend
-            tar -xzf deploy.tar.gz
-            rm deploy.tar.gz
+            # 1. Definimos las rutas de ec2-user
+            export PNPM_HOME="/home/ec2-user/.local/share/pnpm"
+            export PATH="$PNPM_HOME:$PATH"
             
+            cd /home/ec2-user/apps/backend
+            
+            # 2. Descomprimir
+            tar -xzf deploy_backend.tar.gz
+            rm deploy_backend.tar.gz
+            
+            # 3. Dependencias de producción
             pnpm install --prod --no-frozen-lockfile
             
             echo "--- Ejecutando Migraciones ---"
             pnpm run db:migrate
             
-            echo "--- Reiniciando PM2 ---"
-            # Como ec2-user, pm2 gestionará sus propios procesos
+            echo "--- Reiniciando Aplicación ---"
+            # Si ya existe, lo reinicia. Si no, lo arranca.
             pm2 restart backend-api || PORT=3000 pm2 start dist/infrastructure/server.js --name "backend-api"
             pm2 save
           EOF
