@@ -9,6 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 1. PRUEBA DE CONEXIÓN (FAST-FAIL)
       - name: Test SSH Connection
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
@@ -19,53 +20,64 @@ jobs:
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
           ssh -i ~/.ssh/id_rsa -o ConnectTimeout=10 ec2-user@${{ secrets.EC2_HOST }} "echo '✅ CONEXIÓN OK' && node -v"
 
+      # 2. CONFIGURACIÓN DEL RUNNER (GITHUB)
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24 # Usamos la misma que el servidor
+          node-version: 24
           cache: 'pnpm'
 
+      # 3. CONSTRUCCIÓN
       - name: Build Project
         run: |
           pnpm install --no-frozen-lockfile
           pnpm run build
 
+      # 4. EMPAQUETADO Y ENVÍO
       - name: Native Deploy (SCP)
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
-          # Empacamos dist, package, lock, config de drizzle y la carpeta de migraciones
-          # Si tu carpeta de migraciones NO se llama 'drizzle', cambia el nombre aquí
+          # Empacamos lo necesario para producción
+          # NOTA: Asegúrate que la carpeta 'drizzle' (migraciones) existe con ese nombre
           tar -czf deploy_backend.tar.gz dist package.json pnpm-lock.yaml drizzle.config.ts drizzle
           
+          # Subimos el archivo al home de ec2-user
           scp -i ~/.ssh/id_rsa deploy_backend.tar.gz ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/apps/backend/
 
+      # 5. COMANDOS REMOTOS (ESTA ES LA PARTE QUE CORRIGE EL ERROR DE DRIZZLE)
       - name: Remote Commands
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
           ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
-            # 1. Definimos las rutas de ec2-user
+            # Cargamos el entorno de pnpm y pm2 del usuario ec2-user
             export PNPM_HOME="/home/ec2-user/.local/share/pnpm"
             export PATH="$PNPM_HOME:$PATH"
             
             cd /home/ec2-user/apps/backend
             
-            # 2. Descomprimir
+            # Limpiamos versión anterior y extraemos la nueva
             tar -xzf deploy_backend.tar.gz
             rm deploy_backend.tar.gz
             
-            # 3. Dependencias de producción
+            # Instalamos dependencias de producción
             pnpm install --prod --no-frozen-lockfile
+            
+            # CORRECCIÓN: Instalamos drizzle-kit para que el comando db:migrate no falle
+            echo "--- Instalando herramientas de migración ---"
+            pnpm add drizzle-kit
             
             echo "--- Ejecutando Migraciones ---"
             pnpm run db:migrate
             
-            echo "--- Reiniciando Aplicación ---"
-            # Si ya existe, lo reinicia. Si no, lo arranca.
+            echo "--- Reiniciando Aplicación con PM2 ---"
+            # Si el proceso 'backend-api' ya existe, lo reinicia. Si no, lo crea.
             pm2 restart backend-api || PORT=3000 pm2 start dist/infrastructure/server.js --name "backend-api"
+            
+            # Guardamos la lista de procesos para que inicien tras un reboot del servidor
             pm2 save
           EOF
