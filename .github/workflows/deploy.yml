@@ -9,41 +9,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy Source to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          timeout: 60s
-          # Solo enviamos lo necesario para construir allá
-          # NO enviamos 'dist' ni 'node_modules'
-          source: "src,package.json,pnpm-lock.yaml,tsconfig.json,drizzle.config.ts,drizzle"
-          target: "/root/apps/backend"
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
-      - name: Build and Restart on EC2
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Build Project
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm run build
+
+      - name: Deploy via Rsync (Nativo)
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          # 1. Configurar la llave
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          # 2. Escanear el servidor para evitar la pregunta de "Confía en este host?"
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          
+          # 3. Sincronizar (Solo subimos lo necesario)
+          # Esto es mucho más estable que la acción anterior
+          rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa" \
+            dist package.json pnpm-lock.yaml drizzle.config.ts drizzle \
+            root@${{ secrets.EC2_HOST }}:/root/apps/backend/
+
+      - name: Migrate and Restart
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
+          username: root
           key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          command_timeout: 15m # Damos tiempo para el build
           script: |
             cd /root/apps/backend
-            
-            # Instalar dependencias
-            pnpm install --no-frozen-lockfile
-            
-            # Compilar el código en el servidor
-            echo "Compilando proyecto..."
-            pnpm run build
-            
-            # Ejecutar migraciones
-            echo "Ejecutando migraciones..."
+            pnpm install --prod --no-frozen-lockfile
             pnpm run db:migrate
-            
-            # Reiniciar con PM2
             pm2 restart backend-api || PORT=3000 pm2 start dist/infrastructure/server.js --name "backend-api"
             pm2 save
