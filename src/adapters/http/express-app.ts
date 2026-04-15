@@ -19,37 +19,40 @@ export function createApp(options: CreateAppOptions): express.Application {
   const { auth, logInboundPayloadError, productRouter } = options;
   const app = express();
 
-  // 1. Trust Proxy habilitado para HTTPS
+  // 1. TRUST PROXY: Vital para detectar HTTPS detrás de Nginx en AWS
   app.set("trust proxy", true);
 
-  // 2. Helmet ajustado para no bloquear el subdominio
+  // 2. HELMET: Configurado para permitir la comunicación entre dominios
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: "cross-origin" },
     })
   );
 
-  // NOTA: Hemos quitado app.use(cors(...)) porque Nginx se encargará de esto.
-  
+  // 3. COMPRESIÓN
   app.use(compression());
 
-  // 3. Handler de Better Auth
+  // 4. BETTER AUTH: El handler debe ir antes de express.json()
   app.all("/api/auth/*", toNodeHandler(auth));
 
+  // 5. BODY PARSER
   app.use(express.json({ limit: "1mb" }));
 
-  // 4. Rutas
+  // 6. RUTAS DE LA API
   app.use("/api/v1/auth", createAuthRouter(auth));
   app.use("/api/v1/products", productRouter);
 
+  // 7. CONTROLADOR HELLO (Greet)
   const greetUseCase = new GreetUseCase();
   const helloController = new HelloController(greetUseCase);
   app.get("/api/hello", helloController.getHello);
 
+  // 8. MANEJADOR 404 (Para rutas de API inexistentes)
   app.use((_req, res) => {
     res.status(404).json({ error: "No encontrado" });
   });
 
+  // 9. ERROR HANDLER GLOBAL: Siempre al final
   app.use(createGlobalErrorHandler(logInboundPayloadError));
 
   return app;
