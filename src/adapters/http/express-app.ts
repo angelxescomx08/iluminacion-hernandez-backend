@@ -1,4 +1,5 @@
 import compression from "compression";
+import cors from "cors";
 import express, { type Router } from "express";
 import helmet from "helmet";
 import { toNodeHandler } from "better-auth/node";
@@ -27,6 +28,16 @@ export function createApp(options: CreateAppOptions): express.Application {
     helmet({
       crossOriginResourcePolicy: { policy: "cross-origin" },
     })
+  );
+
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.use(
+    cors({
+      origin: allowedOrigins?.length ? allowedOrigins : true,
+      credentials: true,
+    }),
   );
 
   // 3. COMPRESIÓN
