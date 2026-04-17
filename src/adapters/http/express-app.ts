@@ -30,15 +30,27 @@ export function createApp(options: CreateAppOptions): express.Application {
     })
   );
 
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
-  app.use(
-    cors({
-      origin: allowedOrigins?.length ? allowedOrigins : true,
-      credentials: true,
-    }),
-  );
+  const corsDelegatedRaw = process.env.CORS_DELEGATED_TO_PROXY?.trim();
+  const delegateCorsToProxy =
+    corsDelegatedRaw === "1" ||
+    corsDelegatedRaw?.toLowerCase() === "true";
+
+  const allowedOrigins = [
+    ...new Set(
+      (process.env.ALLOWED_ORIGINS?.split(",") ?? [])
+        .map((o) => o.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (!delegateCorsToProxy) {
+    app.use(
+      cors({
+        origin: allowedOrigins.length ? allowedOrigins : true,
+        credentials: true,
+      }),
+    );
+  }
 
   // 3. COMPRESIÓN
   app.use(compression());
