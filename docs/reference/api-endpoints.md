@@ -74,6 +74,22 @@ Descripción técnica de las rutas expuestas por el servidor Express. Pensada pa
 
 ---
 
+### Contacto (`/api/v1/contact`)
+
+**Montaje:** la ruta está **siempre** registrada. Si falta `RESEND_API_KEY`, `CONTACT_TO_EMAIL` o `CONTACT_FROM_EMAIL`, responde **503** (`code: email_not_configured`). Revisa `.env.example`.
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/contact` | No | Envía el mensaje del formulario de contacto por correo (Resend) a `CONTACT_TO_EMAIL`. Cuerpo JSON: `nombre`, `telefono`, `email` (obligatorios), `mensaje` (opcional). |
+
+**Respuesta exitosa:** `201` — `{ "id": string | null }` (id del mensaje en Resend).
+
+**Errores:** `400` si falta `nombre`, `telefono` o `email`, o si `email` no es válido (`code: invalid_body`). `502` si Resend rechaza el envío (`code: email_send_failed`). `503` si Resend no está configurado (`code: email_not_configured`).
+
+**Nota:** el correo se envía con `replyTo` = el email del remitente, para poder responder directamente desde el buzón.
+
+---
+
 ### `GET /api/hello`
 
 | | |
@@ -183,6 +199,7 @@ El resto de rutas (`sign-up`, `sign-in`, gestión de cuenta, etc.) están defini
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Habilitan login Google si ambas están definidas. |
 | `STRIPE_SECRET_KEY` / `STRIPE_CURRENCY` | Catálogo: creación de Product/Price en Stripe. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (y opc. `AWS_SESSION_TOKEN`), `AWS_REGION`, `S3_BUCKET`, `S3_ENDPOINT` (opc.), `S3_PUBLIC_BASE_URL` (opc.) | Catálogo: credenciales y bucket S3 (o MinIO con las mismas variables + `S3_ENDPOINT`). |
+| `RESEND_API_KEY` / `CONTACT_TO_EMAIL` / `CONTACT_FROM_EMAIL` | Contacto: envío de correo del formulario vía Resend. |
 
 ---
 
@@ -191,3 +208,4 @@ El resto de rutas (`sign-up`, `sign-in`, gestión de cuenta, etc.) están defini
 Actualiza este archivo cuando añadas o cambies rutas en `express-app` o en los routers montados.
 
 - Catálogo `/api/v1/products` (Stripe + S3, slug, imágenes, paginación y búsqueda).
+- Contacto `/api/v1/contact` (envío de correo vía Resend).

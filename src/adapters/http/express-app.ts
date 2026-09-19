@@ -14,10 +14,11 @@ export type CreateAppOptions = {
   auth: Auth;
   logInboundPayloadError: LogInboundPayloadErrorUseCase;
   productRouter: Router;
+  contactRouter: Router;
 };
 
 export function createApp(options: CreateAppOptions): express.Application {
-  const { auth, logInboundPayloadError, productRouter } = options;
+  const { auth, logInboundPayloadError, productRouter, contactRouter } = options;
   const app = express();
 
   // 1. TRUST PROXY: Vital para detectar HTTPS detrás de Nginx en AWS
@@ -64,6 +65,7 @@ export function createApp(options: CreateAppOptions): express.Application {
   // 6. RUTAS DE LA API
   app.use("/api/v1/auth", createAuthRouter(auth));
   app.use("/api/v1/products", productRouter);
+  app.use("/api/v1/contact", contactRouter);
 
   // 7. CONTROLADOR HELLO (Greet)
   const greetUseCase = new GreetUseCase();

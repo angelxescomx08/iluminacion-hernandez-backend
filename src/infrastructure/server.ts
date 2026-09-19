@@ -1,7 +1,9 @@
 import "dotenv/config";
 import "express-async-errors";
 import { createApp } from "../adapters/http/express-app.js";
+import { createContactRouter } from "../adapters/http/contact.routes.js";
 import { createProductRouter } from "../adapters/http/product.routes.js";
+import { ResendEmailSenderAdapter } from "../adapters/email/resend-email-sender.adapter.js";
 import { StripeCatalogAdapter } from "../adapters/payments/stripe-catalog.adapter.js";
 import { InboundPayloadErrorLogDrizzleRepository } from "../adapters/persistence/drizzle/repositories/inbound-payload-error-log.drizzle.repository.js";
 import { ProductDrizzleRepository } from "../adapters/persistence/drizzle/repositories/product.drizzle.repository.js";
@@ -15,10 +17,12 @@ import { GetProductByIdUseCase } from "../use-cases/get-product-by-id.use-case.j
 import { GetProductBySlugUseCase } from "../use-cases/get-product-by-slug.use-case.js";
 import { ListProductsUseCase } from "../use-cases/list-products.use-case.js";
 import { LogInboundPayloadErrorUseCase } from "../use-cases/log-inbound-payload-error.use-case.js";
+import { SendContactMessageUseCase } from "../use-cases/send-contact-message.use-case.js";
 import { SetMainProductImageUseCase } from "../use-cases/set-main-product-image.use-case.js";
 import { UpdateProductUseCase } from "../use-cases/update-product.use-case.js";
 import { createAuth } from "./auth/create-auth.js";
 import {
+  createUnconfiguredEmailSenderPort,
   createUnconfiguredObjectStoragePort,
   createUnconfiguredProductCatalogPort,
 } from "./unconfigured-ports.js";
@@ -39,6 +43,9 @@ const s3Bucket = process.env.S3_BUCKET?.trim();
 const s3PublicBaseUrl = process.env.S3_PUBLIC_BASE_URL?.trim();
 const awsRegion = (process.env.AWS_REGION ?? "us-east-1").trim();
 const s3Endpoint = process.env.S3_ENDPOINT?.trim();
+const resendApiKey = process.env.RESEND_API_KEY?.trim();
+const contactToEmail = process.env.CONTACT_TO_EMAIL?.trim();
+const contactFromEmail = process.env.CONTACT_FROM_EMAIL?.trim();
 
 const productRepo = new ProductDrizzleRepository(database.db);
 const stripeCatalog = stripeSecretKey
@@ -53,11 +60,21 @@ const objectStorage = s3Bucket
     })
   : createUnconfiguredObjectStoragePort();
 
+const emailSender =
+  resendApiKey && contactToEmail && contactFromEmail
+    ? new ResendEmailSenderAdapter(resendApiKey)
+    : createUnconfiguredEmailSenderPort();
+
 if (!stripeSecretKey) {
   console.warn("STRIPE_SECRET_KEY ausente: POST/PATCH de productos responderán 503 hasta configurar Stripe.");
 }
 if (!s3Bucket) {
   console.warn("S3_BUCKET ausente: la subida de imágenes responderá 503 hasta configurar S3.");
+}
+if (!resendApiKey || !contactToEmail || !contactFromEmail) {
+  console.warn(
+    "RESEND_API_KEY, CONTACT_TO_EMAIL o CONTACT_FROM_EMAIL ausentes: el formulario de contacto responderá 503 hasta configurarlos.",
+  );
 }
 
 const productRouter = createProductRouter({
@@ -73,8 +90,16 @@ const productRouter = createProductRouter({
   setMainProductImage: new SetMainProductImageUseCase(productRepo, stripeCatalog),
 });
 
+const contactRouter = createContactRouter({
+  sendContactMessage: new SendContactMessageUseCase(
+    emailSender,
+    contactToEmail ?? "",
+    contactFromEmail ?? "",
+  ),
+});
+
 const port = Number(process.env.PORT) || 3000;
-const app = createApp({ auth, logInboundPayloadError, productRouter });
+const app = createApp({ auth, logInboundPayloadError, productRouter, contactRouter });
 
 const server = app.listen(port, () => {
   console.log(`Servidor escuchando en http://localhost:${port}`);
