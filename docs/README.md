@@ -5,7 +5,7 @@ Este directorio sigue una organización inspirada en [Diátaxis](https://diataxi
 | Tipo | Propósito | Contenido en este repo |
 |------|-----------|-------------------------|
 | **Referencia** | Consultar hechos técnicos (rutas, métodos, contratos) | [`reference/api-endpoints.md`](reference/api-endpoints.md) |
-| **Guías prácticas** | Resolver una tarea concreta | *Pendiente* (p. ej. despliegue, OAuth Google) |
+| **Guías prácticas** | Resolver una tarea concreta | [`guides/servidor-produccion.md`](guides/servidor-produccion.md) (acceso SSH, `.env`, reinicio con PM2) |
 | **Tutorial** | Aprender haciendo, de principio a fin | *Pendiente* |
 | **Explicación** | Entender decisiones de arquitectura | *Pendiente* |
 
