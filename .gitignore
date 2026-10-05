@@ -6,3 +6,5 @@ pnpm-debug.log*
 .env.*.local
 .DS_Store
 .env.prod
+# llaves privadas / certificados
+*.pem
