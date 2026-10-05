@@ -9,6 +9,10 @@ export type SendContactMessageInput = {
   mensaje?: string | null;
 };
 
+/** Etiqueta en el asunto para distinguir (y filtrar en Gmail) los correos que llegan desde el sitio web. */
+export const WEBSITE_SUBJECT_TAG = "[Sitio web]";
+const WEBSITE_FOOTER = "Enviado desde el formulario de contacto de iluminacion-hernandez.com";
+
 function buildEmailBody(input: SendContactMessageInput): string {
   return [
     `Nombre: ${input.nombre}`,
@@ -17,6 +21,9 @@ function buildEmailBody(input: SendContactMessageInput): string {
     "",
     "Mensaje:",
     input.mensaje?.trim() || "(sin mensaje)",
+    "",
+    "—",
+    WEBSITE_FOOTER,
   ].join("\n");
 }
 
@@ -46,7 +53,7 @@ export class SendContactMessageUseCase {
       to: [this.toAddress],
       from: this.fromAddress,
       replyTo: email,
-      subject: `Nuevo mensaje de contacto — ${nombre}`,
+      subject: `${WEBSITE_SUBJECT_TAG} Nuevo mensaje de contacto — ${nombre}`,
       text: buildEmailBody({ nombre, telefono, email, mensaje: input.mensaje }),
     });
   }
