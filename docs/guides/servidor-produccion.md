@@ -114,4 +114,4 @@ El workflow **no toca el `.env` del servidor**: las variables nuevas del backend
 ## Pendientes (4 de octubre de 2026)
 
 - [ ] Agregar `RESEND_API_KEY`, `CONTACT_TO_EMAIL` y `CONTACT_FROM_EMAIL` al `.env` del backend. Sin ellas, el formulario de contacto responde 503.
-- [ ] Volver a sincronizar los productos con Stripe: sus `stripe_product_id` y `stripe_price_id` se crearon con la llave de prueba y no existen en producción.
+- [x] Catálogo Coolfan (34 productos) cargado en producción con Stripe live e imágenes en S3 el 4 de octubre de 2026.
