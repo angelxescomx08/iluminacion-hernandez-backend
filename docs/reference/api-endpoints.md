@@ -101,6 +101,25 @@ Descripción técnica de las rutas expuestas por el servidor Express. Pensada pa
 
 ---
 
+### Compras (`/api/v1/checkout`, `/api/v1/orders`, `/api/v1/stripe/webhook`)
+
+Pago con **Stripe Checkout** (página alojada por Stripe, solo tarjeta). Se monta si existe `STRIPE_SECRET_KEY`. Las rutas marcadas "Usuario" requieren sesión iniciada (cualquier rol); sin sesión responden **401** (`code: unauthenticated`).
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/checkout/options` | No | Costo de envío (`SHIPPING_FLAT_RATE`, por defecto $199), sucursal para recoger y máximo de piezas por producto. |
+| `POST` | `/api/v1/checkout/sessions` | Usuario | Crea pedido `pending` y Checkout Session. Cuerpo: `items` (`[{ productId, quantity }]`, 1–10 piezas por producto, máx. 20 productos) y `fulfillment` (`shipping` \| `pickup`). Valida producto activo y stock. Responde **201** `{ orderId, checkoutSessionId, checkoutUrl }`. Errores: `empty_cart`, `invalid_quantity`, `invalid_fulfillment`, `product_unavailable` (400), `insufficient_stock` (409). |
+| `GET` | `/api/v1/checkout/sessions/:sessionId` | Usuario | Página de éxito: consulta la sesión en Stripe y **confirma el pedido si ya se pagó** (además del webhook). Devuelve el pedido del usuario o 404. |
+| `POST` | `/api/v1/checkout/orders/:orderId/cancel` | Usuario | El cliente regresó desde Stripe sin pagar: expira la sesión en Stripe y deja el pedido `canceled`. |
+| `GET` | `/api/v1/orders` | Usuario | Últimos 50 pedidos del usuario. |
+| `POST` | `/api/v1/stripe/webhook` | Firma Stripe | Cuerpo crudo + `Stripe-Signature` verificada con `STRIPE_WEBHOOK_SECRET` (400 si no es válida, 503 si falta el secreto). Maneja `checkout.session.completed`, `checkout.session.async_payment_succeeded/failed`, `checkout.session.expired`, `charge.refunded` y `charge.dispute.created/updated/closed`. |
+
+**Estados del pedido:** `pending` → `paid` | `canceled` | `expired`; `paid` → `refunded` (reembolso total desde Stripe: regresa el stock y avisa al cliente y al negocio). Un reembolso parcial deja `paid` y guarda `refunded_amount`. Un contracargo guarda `dispute_status`/`dispute_reason` y manda "[Sitio web] URGENTE: contracargo" al negocio. La confirmación es idempotente: aunque webhook y página de éxito lleguen a la vez, solo una vez se descuenta stock y se envían los correos.
+
+**Correos al pagarse (Resend, remitente `CONTACT_FROM_EMAIL`):** aviso "[Sitio web] Nuevo pedido #XXXX" a `ORDER_NOTIFY_EMAIL` (o `CONTACT_TO_EMAIL`) y confirmación al cliente. Los envíos quedan registrados en `orders.owner_email_sent_at` / `customer_email_sent_at`.
+
+**Producción:** en el Dashboard de Stripe (modo live) crea un endpoint de webhook a `https://api.iluminacion-hernandez.com/api/v1/stripe/webhook` con los 8 eventos de arriba y pon su `whsec_…` en `STRIPE_WEBHOOK_SECRET`.
+
 ## Autenticación REST explícita (`/api/v1/auth`)
 
 Estas rutas delegan en la API interna de Better Auth (`auth.api`) y reenvían cabeceras y cuerpo de respuesta (incluidas cookies de sesión cuando corresponda).

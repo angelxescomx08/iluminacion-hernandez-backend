@@ -15,10 +15,15 @@ export type CreateAppOptions = {
   logInboundPayloadError: LogInboundPayloadErrorUseCase;
   productRouter: Router;
   contactRouter: Router;
+  /** Rutas de compra (`/api/v1/checkout/*`, `/api/v1/orders`). */
+  checkoutRouter?: Router;
+  /** Webhook de Stripe; se monta antes de `express.json()` porque necesita el cuerpo crudo. */
+  stripeWebhookRouter?: Router;
 };
 
 export function createApp(options: CreateAppOptions): express.Application {
-  const { auth, logInboundPayloadError, productRouter, contactRouter } = options;
+  const { auth, logInboundPayloadError, productRouter, contactRouter, checkoutRouter, stripeWebhookRouter } =
+    options;
   const app = express();
 
   // 1. TRUST PROXY: Vital para detectar HTTPS detrás de Nginx en AWS
@@ -59,6 +64,11 @@ export function createApp(options: CreateAppOptions): express.Application {
   // 4. BETTER AUTH: El handler debe ir antes de express.json()
   app.all("/api/auth/*", toNodeHandler(auth));
 
+  // 4.1 WEBHOOK DE STRIPE: cuerpo crudo para verificar la firma (antes de express.json()).
+  if (stripeWebhookRouter) {
+    app.use("/api/v1/stripe/webhook", stripeWebhookRouter);
+  }
+
   // 5. BODY PARSER
   app.use(express.json({ limit: "1mb" }));
 
@@ -66,6 +76,9 @@ export function createApp(options: CreateAppOptions): express.Application {
   app.use("/api/v1/auth", createAuthRouter(auth));
   app.use("/api/v1/products", productRouter);
   app.use("/api/v1/contact", contactRouter);
+  if (checkoutRouter) {
+    app.use("/api/v1", checkoutRouter);
+  }
 
   // 7. CONTROLADOR HELLO (Greet)
   const greetUseCase = new GreetUseCase();
